@@ -47,12 +47,13 @@ export default function Ride({ initialSession, onReset }: RideProps) {
           let updated = { ...prev };
           const offRoute = fix.offsetMeters > OFF_ROUTE_THRESHOLD_M;
           if (offRoute && !prev.manualPaused && !prev.pausedAt) {
-            updated = { ...updated, pausedAt: nowMs };
+            updated = { ...updated, pausedAt: nowMs, status: 'paused' };
           } else if (!offRoute && !prev.manualPaused && prev.pausedAt) {
             updated = {
               ...updated,
               totalPausedMs: prev.totalPausedMs + (nowMs - prev.pausedAt),
               pausedAt: null,
+              status: 'riding',
             };
           }
 
@@ -137,9 +138,6 @@ export default function Ride({ initialSession, onReset }: RideProps) {
   const aheadColor = aheadBehindM >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]';
   const deltaColor = speedDelta <= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]';
 
-  // MetricCard is available for future use
-  void MetricCard;
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
       {/* Header bar */}
@@ -180,59 +178,47 @@ export default function Ride({ initialSession, onReset }: RideProps) {
         <div className="flex-1 px-4">
           {/* Primary metrics */}
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="bg-[#111] rounded-xl p-4 col-span-1">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Ahead / Behind</div>
-              <div className={`text-4xl font-black tabular-nums ${aheadColor}`}>
-                {fmtKmSigned(aheadBehindM)}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">km</div>
-            </div>
-            <div className="bg-[#111] rounded-xl p-4 col-span-1">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Speed Adj.</div>
-              <div className={`text-4xl font-black tabular-nums ${deltaColor}`}>
-                {speedDelta > 0 ? '+' : ''}{speedDelta.toFixed(1)}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">km/h</div>
-            </div>
+            <MetricCard
+              label="Ahead / Behind"
+              value={fmtKmSigned(aheadBehindM)}
+              unit="km"
+              color={aheadColor}
+              large
+            />
+            <MetricCard
+              label="Speed Adj."
+              value={`${speedDelta > 0 ? '+' : ''}${speedDelta.toFixed(1)}`}
+              unit="km/h"
+              color={deltaColor}
+              large
+            />
           </div>
 
           {/* Secondary metrics */}
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="bg-[#111] rounded-xl p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Current</div>
-              <div className="text-xl font-black tabular-nums">{fmtKmh(currentSpeedMs)}</div>
-              <div className="text-xs text-gray-500">km/h</div>
-            </div>
-            <div className="bg-[#111] rounded-xl p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Avg</div>
-              <div className="text-xl font-black tabular-nums">{fmtKmh(avgSpeedMs)}</div>
-              <div className="text-xs text-gray-500">km/h</div>
-            </div>
-            <div className="bg-[#111] rounded-xl p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Expected</div>
-              <div className="text-xl font-black tabular-nums">{fmtKmh(expected.expectedSpeedMs)}</div>
-              <div className="text-xs text-gray-500">km/h</div>
-            </div>
+            <MetricCard label="Current" value={fmtKmh(currentSpeedMs)} unit="km/h" />
+            <MetricCard label="Avg" value={fmtKmh(avgSpeedMs)} unit="km/h" />
+            <MetricCard label="Expected" value={fmtKmh(expected.expectedSpeedMs)} unit="km/h" />
           </div>
 
           <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-[#111] rounded-xl p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Elapsed</div>
-              <div className="text-xl font-black tabular-nums">{fmtHMM(elapsedS)}</div>
-              <div className="text-xs text-gray-500">of {fmtHMM(session.targetSeconds)}</div>
-            </div>
-            <div className="bg-[#111] rounded-xl p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Distance</div>
-              <div className="text-xl font-black tabular-nums">{fmtKm(distanceAlong)}</div>
-              <div className="text-xs text-gray-500">of {fmtKm(totalDistanceM)} km</div>
-            </div>
+            <MetricCard
+              label="Elapsed"
+              value={fmtHMM(elapsedS)}
+              subtext={`of ${fmtHMM(session.targetSeconds)}`}
+            />
+            <MetricCard
+              label="Distance"
+              value={fmtKm(distanceAlong)}
+              subtext={`of ${fmtKm(totalDistanceM)} km`}
+            />
           </div>
 
-          <div className="bg-[#111] rounded-xl p-3 mb-3">
-            <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">ETA</div>
-            <div className="text-xl font-black tabular-nums">
-              {fmtETA(distanceAlong, avgSpeedMs, totalDistanceM, now)}
-            </div>
+          <div className="mb-3">
+            <MetricCard
+              label="ETA"
+              value={fmtETA(distanceAlong, avgSpeedMs, totalDistanceM, now)}
+            />
           </div>
         </div>
       )}
