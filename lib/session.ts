@@ -2,6 +2,8 @@ import { Session } from '../types';
 
 const STORAGE_KEY = 'pacetrack_session';
 
+export const OFF_ROUTE_THRESHOLD_M = 100;
+
 export function loadSession(): Session | null {
   if (typeof window === 'undefined') return null;
   try {

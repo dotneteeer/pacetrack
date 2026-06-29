@@ -66,7 +66,7 @@ export function buildSchedule(route: RoutePoint[], targetSeconds: number): Sched
     times.push(scale * cumRaw);
   }
 
-  return { times, rawCosts, scale, totalRaw };
+  return { times, rawCosts, scale, totalRaw, smoothedEles: smoothedEle };
 }
 
 export function expectedAtTime(
@@ -82,14 +82,14 @@ export function expectedAtTime(
   }
 
   if (elapsedSeconds <= 0) {
-    const grade = route.length >= 2 ? computeGrade(route, 0) : 0;
+    const grade = route.length >= 2 ? computeGrade(route, 0, schedule.smoothedEles) : 0;
     const expectedSpeedMs = scale > 0 ? gradeSpeedFactor(grade) / scale : 0;
     return { distanceAlong: route[0].dist, lat: route[0].lat, lon: route[0].lon, segmentIndex: 0, expectedSpeedMs };
   }
 
   if (elapsedSeconds >= times[n - 1]) {
     const last = route[n - 1];
-    const grade = route.length >= 2 ? computeGrade(route, n - 2) : 0;
+    const grade = route.length >= 2 ? computeGrade(route, n - 2, schedule.smoothedEles) : 0;
     const expectedSpeedMs = scale > 0 ? gradeSpeedFactor(grade) / scale : 0;
     return { distanceAlong: last.dist, lat: last.lat, lon: last.lon, segmentIndex: n - 2, expectedSpeedMs };
   }
@@ -109,16 +109,16 @@ export function expectedAtTime(
   const lat = A.lat + frac * (B.lat - A.lat);
   const lon = A.lon + frac * (B.lon - A.lon);
 
-  const grade = computeGrade(route, lo);
+  const grade = computeGrade(route, lo, schedule.smoothedEles);
   const expectedSpeedMs = scale > 0 ? gradeSpeedFactor(grade) / scale : 0;
 
   return { distanceAlong, lat, lon, segmentIndex: lo, expectedSpeedMs };
 }
 
-function computeGrade(route: RoutePoint[], segmentIndex: number): number {
+function computeGrade(route: RoutePoint[], segmentIndex: number, eles?: number[]): number {
   const i = Math.max(0, Math.min(segmentIndex, route.length - 2));
   const dDist = route[i + 1].dist - route[i].dist;
-  const dEle = route[i + 1].ele - route[i].ele;
+  const dEle = eles ? eles[i + 1] - eles[i] : route[i + 1].ele - route[i].ele;
   return dDist > 0 ? dEle / dDist : 0;
 }
 
@@ -149,7 +149,7 @@ export function speedDeltaKmh(
 
   // Grade at current position
   const segIdx = Math.max(0, firstAhead - 1);
-  const grade = computeGrade(route, segIdx);
+  const grade = computeGrade(route, segIdx, schedule.smoothedEles);
   const f = gradeSpeedFactor(grade);
 
   // speed = f / scale (m/s); delta = f/scalePrime - f/scale (m/s) → km/h

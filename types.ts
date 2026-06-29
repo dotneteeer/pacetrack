@@ -6,10 +6,11 @@ export interface RoutePoint {
 }
 
 export interface Schedule {
-  times: number[];     // T_i: expected arrival time (seconds) at each RoutePoint
-  rawCosts: number[];  // raw_i per segment (for remaining-route recalc)
-  scale: number;       // s/m: targetSeconds / totalRaw
-  totalRaw: number;    // Σ raw_i
+  times: number[];        // T_i: expected arrival time (seconds) at each RoutePoint
+  rawCosts: number[];     // raw_i per segment (for remaining-route recalc)
+  scale: number;          // s/m: targetSeconds / totalRaw
+  totalRaw: number;       // Σ raw_i
+  smoothedEles: number[]; // smoothed elevation per RoutePoint (matches buildSchedule smoothing)
 }
 
 export interface FixResult {
