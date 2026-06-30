@@ -27,7 +27,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Cache-first for app shell; network-first for map tiles and everything else
-  if (url.origin === self.location.origin && url.pathname !== '/_next/') {
+  if (url.origin === self.location.origin && !url.pathname.startsWith('/_next/')) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request))
     );

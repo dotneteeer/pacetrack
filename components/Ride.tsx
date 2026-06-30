@@ -73,7 +73,7 @@ export default function Ride({ initialSession, onReset }: RideProps) {
           const newSession: Session = {
             ...updated,
             lastFix: newFix,
-            prevFix: prev.lastFix ? { ...prev.lastFix, timestamp: prev.prevFix?.timestamp ?? nowMs } : null,
+            prevFix: prev.lastFix ? { ...prev.lastFix, timestamp: nowMs } : null,
           };
           saveSession(newSession);
           return newSession;
