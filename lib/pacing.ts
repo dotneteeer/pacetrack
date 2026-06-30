@@ -24,7 +24,7 @@ export function gradeSpeedFactor(grade: number): number {
   return 1.0; // fallback
 }
 
-function smoothElevation(points: RoutePoint[], window: number): number[] {
+export function smoothElevation(points: RoutePoint[], window: number): number[] {
   const eles = points.map(p => p.ele);
   const smoothed: number[] = [];
   const half = Math.floor(window / 2);
@@ -36,6 +36,27 @@ function smoothElevation(points: RoutePoint[], window: number): number[] {
     smoothed.push(sum / (hi - lo + 1));
   }
   return smoothed;
+}
+
+/**
+ * Compute elevation gain using smoothed elevation + hysteresis threshold.
+ * Tracks a running low; only counts a climb once it exceeds `threshold` metres.
+ * Greatly reduces GPS/baro noise vs summing raw deltas.
+ */
+export function elevationGain(route: RoutePoint[], threshold = 5): number {
+  if (route.length < 2) return 0;
+  const smoothed = smoothElevation(route, 5);
+  let gain = 0;
+  let low = smoothed[0];
+  for (let i = 1; i < smoothed.length; i++) {
+    if (smoothed[i] < low) {
+      low = smoothed[i];
+    } else if (smoothed[i] - low >= threshold) {
+      gain += smoothed[i] - low;
+      low = smoothed[i];
+    }
+  }
+  return gain;
 }
 
 export function buildSchedule(route: RoutePoint[], targetSeconds: number): Schedule {

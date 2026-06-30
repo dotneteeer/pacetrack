@@ -15,6 +15,7 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
   const leafletRef = useRef<any>(null); // holds L (Leaflet instance)
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<{ dot?: any; ghost?: any; dotLayer?: any; completedLayer?: any }>({});
+  const roRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
     // Dynamic import Leaflet (avoids SSR window error)
@@ -35,26 +36,40 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
         attributionControl: true,
       });
 
+      // CartoDB Voyager — bright street map, Strava/Komoot style
       L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
         {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
           subdomains: 'abcd',
-          maxZoom: 19,
+          maxZoom: 20,
         }
       ).addTo(map);
 
       mapInstanceRef.current = map;
 
-      // Draw full route in grey
+      // Draw full route: white casing underneath, faded orange on top
       if (route.length > 1) {
         const latlngs = route.map((p) => [p.lat, p.lon] as [number, number]);
-        L.polyline(latlngs, { color: '#555555', weight: 3, opacity: 0.8 }).addTo(map);
+        L.polyline(latlngs, { color: '#ffffff', weight: 6, opacity: 0.7 }).addTo(map);
+        L.polyline(latlngs, { color: '#FC4C02', weight: 4, opacity: 0.45 }).addTo(map);
         map.fitBounds(L.latLngBounds(latlngs), { padding: [20, 20] });
+      }
+
+      // Force tile-load after container has correct layout dimensions
+      requestAnimationFrame(() => map.invalidateSize());
+
+      // ResizeObserver: keeps map correct when container changes size (tab switch)
+      if (mapRef.current) {
+        const ro = new ResizeObserver(() => map.invalidateSize());
+        ro.observe(mapRef.current);
+        roRef.current = ro;
       }
     });
 
     return () => {
+      roRef.current?.disconnect();
+      roRef.current = null;
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
     };
@@ -66,12 +81,12 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
-    // Remove old layers
+    // Remove old dynamic layers
     markersRef.current.completedLayer?.remove();
     markersRef.current.dotLayer?.remove();
     markersRef.current.ghost?.remove();
 
-    // Completed portion (orange)
+    // Completed portion — solid orange on top of casing
     const completedPoints = route.filter((p) => p.dist <= distanceAlong);
     if (completedPoints.length > 1) {
       const latlngs = completedPoints.map((p) => [p.lat, p.lon] as [number, number]);

@@ -34,4 +34,7 @@ export interface Session {
   pausedAt: number | null;      // ms epoch when current pause started
   lastFix: FixResult | null;
   prevFix: (FixResult & { timestamp: number }) | null;
+  startDistanceAlong: number | null; // distanceAlong at first GPS fix (for avg speed)
+  lastFixAt: number | null;          // ms epoch of most recent GPS fix
+  lastSpeedMs: number | null;        // current speed in m/s (GPS or derived)
 }
