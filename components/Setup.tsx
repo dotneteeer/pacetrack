@@ -59,6 +59,9 @@ export default function Setup({ onStart }: SetupProps) {
       startDistanceAlong: null,
       lastFixAt: null,
       lastSpeedMs: null,
+      lastHeading: null,
+      track: [],
+      endTimestamp: null,
     };
     saveSession(session);
     onStart(session);

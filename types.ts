@@ -21,6 +21,15 @@ export interface FixResult {
   segmentIndex: number;  // which segment the projection landed on
 }
 
+export interface TrackSample {
+  t: number;     // ms epoch
+  lat: number;
+  lon: number;
+  ele: number;   // meters (GPS altitude or interpolated route elevation)
+  speed: number; // m/s
+  dist: number;  // distanceAlong meters
+}
+
 export type SessionStatus = 'idle' | 'riding' | 'paused' | 'finished';
 
 export interface Session {
@@ -37,4 +46,7 @@ export interface Session {
   startDistanceAlong: number | null; // distanceAlong at first GPS fix (for avg speed)
   lastFixAt: number | null;          // ms epoch of most recent GPS fix
   lastSpeedMs: number | null;        // current speed in m/s (GPS or derived)
+  lastHeading: number | null;        // degrees 0–360 (north-up); null when stationary
+  track: TrackSample[];              // recorded GPS samples for export
+  endTimestamp: number | null;       // ms epoch when ride finished; null while active
 }

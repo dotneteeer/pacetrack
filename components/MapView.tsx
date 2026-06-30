@@ -7,18 +7,27 @@ interface MapViewProps {
   route: RoutePoint[];
   currentFix: FixResult | null;
   expectedPosition: { lat: number; lon: number } | null;
-  distanceAlong: number; // meters — used to shade completed portion
+  distanceAlong: number; // metres — used to shade completed portion
+  follow?: boolean;       // pan to currentFix on each update
+  heading?: number | null; // degrees 0–360; null = show pulse dot, number = show arrow
 }
 
-export default function MapView({ route, currentFix, expectedPosition, distanceAlong }: MapViewProps) {
+export default function MapView({
+  route,
+  currentFix,
+  expectedPosition,
+  distanceAlong,
+  follow = false,
+  heading = null,
+}: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletRef = useRef<any>(null); // holds L (Leaflet instance)
+  const leafletRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<{ dot?: any; ghost?: any; dotLayer?: any; completedLayer?: any }>({});
   const roRef = useRef<ResizeObserver | null>(null);
+  const initialFollowZoomDoneRef = useRef(false);
 
   useEffect(() => {
-    // Dynamic import Leaflet (avoids SSR window error)
     import('leaflet').then((L) => {
       leafletRef.current = L;
       if (!mapRef.current || mapInstanceRef.current) return;
@@ -34,6 +43,8 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
       const map = L.map(mapRef.current, {
         zoomControl: true,
         attributionControl: true,
+        // Canvas renderer prevents SVG polyline clipping on pan for long routes
+        preferCanvas: true,
       });
 
       // CartoDB Voyager — bright street map, Strava/Komoot style
@@ -72,10 +83,11 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
       roRef.current = null;
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
+      initialFollowZoomDoneRef.current = false;
     };
   }, []); // mount only — route drawn once
 
-  // Update completed portion, current dot, ghost marker when props change
+  // Update completed portion, current marker, ghost, and follow position when props change
   useEffect(() => {
     const L = leafletRef.current;
     const map = mapInstanceRef.current;
@@ -97,18 +109,49 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
       }).addTo(map);
     }
 
-    // Current position — pulsing dot via DivIcon
+    // Current position marker
     if (currentFix) {
-      const dotIcon = L.divIcon({
-        className: '',
-        html: '<div class="pulse-dot"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
-      });
-      markersRef.current.dotLayer = L.marker([currentFix.lat, currentFix.lon], {
-        icon: dotIcon,
-        zIndexOffset: 1000,
-      }).addTo(map);
+      const hasHeading = heading !== null && heading !== undefined && !isNaN(heading as number);
+
+      if (hasHeading) {
+        // Arrow marker — triangular SVG pointing north, rotated to heading
+        const arrowIcon = L.divIcon({
+          className: '',
+          html: `<svg width="20" height="28" viewBox="0 0 20 28"
+            style="transform:rotate(${heading}deg);transform-origin:50% 50%;display:block;overflow:visible;">
+            <polygon points="10,0 20,28 10,21 0,28"
+              fill="#FC4C02" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+          </svg>`,
+          iconSize: [20, 28],
+          iconAnchor: [10, 14],
+        });
+        markersRef.current.dotLayer = L.marker([currentFix.lat, currentFix.lon], {
+          icon: arrowIcon,
+          zIndexOffset: 1000,
+        }).addTo(map);
+      } else {
+        // Fallback — pulsing dot when stationary / no heading
+        const dotIcon = L.divIcon({
+          className: '',
+          html: '<div class="pulse-dot"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        });
+        markersRef.current.dotLayer = L.marker([currentFix.lat, currentFix.lon], {
+          icon: dotIcon,
+          zIndexOffset: 1000,
+        }).addTo(map);
+      }
+
+      // Follow mode: pan to (or zoom+pan to on first fix) current position
+      if (follow) {
+        if (!initialFollowZoomDoneRef.current) {
+          map.setView([currentFix.lat, currentFix.lon], 16);
+          initialFollowZoomDoneRef.current = true;
+        } else {
+          map.panTo([currentFix.lat, currentFix.lon]);
+        }
+      }
     }
 
     // Ghost marker — expected position (hollow orange circle)
@@ -124,7 +167,7 @@ export default function MapView({ route, currentFix, expectedPosition, distanceA
         zIndexOffset: 500,
       }).addTo(map);
     }
-  }, [route, currentFix, expectedPosition, distanceAlong]);
+  }, [route, currentFix, expectedPosition, distanceAlong, follow, heading]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />;
 }

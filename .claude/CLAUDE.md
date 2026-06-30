@@ -26,12 +26,13 @@ Downhill is capped (safety). Interpolated linearly between anchors.
 `elevationGain(route, threshold=5)` — smoothed gain with hysteresis (replaces naive delta sum)
 
 ## localStorage keys
-- `pacetrack_session` — JSON blob of full Session object
+- `pacetrack_session` — JSON blob of full Session object (persists until user taps RESET/NEW RIDE)
 
 ## Session shape (types.ts)
 RoutePoint: { lat, lon, ele, dist }  (dist = cumulative m from start)
 Schedule: { times: number[], rawCosts: number[], scale: number, totalRaw: number, smoothedEles: number[] }
 FixResult: { distanceAlong: number, offsetMeters: number, lat: number, lon: number, segmentIndex: number }
+TrackSample: { t, lat, lon, ele, speed, dist }  (recorded fix; speed m/s; ele GPS or interpolated route)
 Session: {
   route: RoutePoint[]
   schedule: Schedule
@@ -46,20 +47,41 @@ Session: {
   startDistanceAlong: number | null  // distanceAlong at first GPS fix (for avg speed)
   lastFixAt: number | null           // ms epoch of most recent GPS fix
   lastSpeedMs: number | null         // current speed m/s (GPS or derived)
+  lastHeading: number | null         // degrees 0–360 north-up; null when stationary
+  track: TrackSample[]               // throttled (≥2 s) GPS recording for export
+  endTimestamp: number | null        // ms epoch when FINISH tapped; null while active
 }
 
 ## GPS model — active while page is open
 watchPosition runs continuously while the page is visible and not manually paused.
-Stops on visibilitychange→hidden or manual pause (battery). Restarts when page
-re-opens or user resumes. Auto-pause when offsetMeters > 100 (off-route);
-watch keeps running during auto-pause so back-on-route is auto-detected.
-Manual REFRESH GPS button as fallback.
+Stops on visibilitychange→hidden, manual pause, or when status==='finished'.
+Restarts when page re-opens or user resumes.
+Auto-pause when offsetMeters > 100 (off-route); watch keeps running during auto-pause
+so back-on-route is auto-detected.
 Clock: 1 s setInterval drives elapsed timer, ghost position, speed delta live.
 
+## Projection hint (loop-route fix)
+projectOntoRoute(lat, lon, route, hintDist?) in lib/geo.ts.
+hintDist = prev distanceAlong. Among candidates within 20 m of global min offset,
+pick the one with distanceAlong closest to hint. Prevents GPS at start snapping
+to finish segment on loop routes.
+
+## Map follow + heading
+MapView props: follow (boolean), heading (number | null degrees 0–360).
+follow=true → panTo on each fix, setView(zoom=16) on first fix.
+heading!=null → SVG arrow marker rotating to heading; else pulse dot.
+Ride passes follow=true + session.lastHeading. Setup passes follow=false.
+
+## Finish flow
+FINISH button → status='finished', endTimestamp set, watch stopped, session saved.
+Finished view: summary cards (time/distance/avg/vs-target) + EXPORT GPX + NEW RIDE.
+Session persists in localStorage until user taps NEW RIDE / RESET.
+EXPORT GPX: buildGpxFromTrack(track, meta) → GPX 1.1 download (Garmin gpxtpx speed extensions).
+
 ## Key files
-- lib/gpx.ts      — parseGpx(xml: string): RoutePoint[]
-- lib/geo.ts      — haversine, projectOntoRoute, buildCumulativeDistances
+- lib/gpx.ts      — parseGpx(xml: string): RoutePoint[]; buildGpxFromTrack(track, meta): string
+- lib/geo.ts      — haversine, bearing, projectOntoRoute(…, hintDist?), buildCumulativeDistances
 - lib/pacing.ts   — buildSchedule, gradeSpeedFactor, expectedAtTime, speedDeltaKmh, elevationGain, smoothElevation
-- lib/session.ts  — loadSession, saveSession, getMovingElapsed
+- lib/session.ts  — loadSession, saveSession, clearSession, getMovingElapsed
 - lib/format.ts   — fmtKm, fmtKmh, fmtHMM, fmtMMSS, fmtClock, fmtETA
 - types.ts        — all shared types
